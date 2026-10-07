@@ -1,0 +1,71 @@
+version: "3.8"
+services:
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+
+  discovery:
+    build: ./services/discovery
+    ports: ["8761:8761"]
+    environment:
+      - PORT=8761
+
+  auth:
+    build: ./services/auth
+    ports: ["4001:4001"]
+    environment:
+      - PORT=4001
+      - JWT_SECRET=${JWT_SECRET:-spendwise_super_secret_change_me}
+      - DISCOVERY_URL=http://discovery:8761
+      - MONGO_URI=mongodb://mongo:27017/spendwise
+    depends_on: [discovery, mongo]
+
+  category:
+    build: ./services/category
+    ports: ["4002:4002"]
+    environment:
+      - PORT=4002
+      - JWT_SECRET=${JWT_SECRET:-spendwise_super_secret_change_me}
+      - DISCOVERY_URL=http://discovery:8761
+      - MONGO_URI=mongodb://mongo:27017/spendwise
+    depends_on: [discovery, mongo]
+
+  expense:
+    build: ./services/expense
+    ports: ["4003:4003"]
+    environment:
+      - PORT=4003
+      - JWT_SECRET=${JWT_SECRET:-spendwise_super_secret_change_me}
+      - DISCOVERY_URL=http://discovery:8761
+      - CATEGORY_SERVICE_URL=http://category:4002
+      - MONGO_URI=mongodb://mongo:27017/spendwise
+    depends_on: [discovery, mongo, category]
+
+  report:
+    build: ./services/report
+    ports: ["4004:4004"]
+    environment:
+      - PORT=4004
+      - JWT_SECRET=${JWT_SECRET:-spendwise_super_secret_change_me}
+      - DISCOVERY_URL=http://discovery:8761
+      - EXPENSE_SERVICE_URL=http://expense:4003
+      - CATEGORY_SERVICE_URL=http://category:4002
+      - MONGO_URI=mongodb://mongo:27017/spendwise
+    depends_on: [discovery, mongo, expense, category]
+
+  gateway:
+    build: ./services/gateway
+    ports: ["4000:4000"]
+    environment:
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET:-spendwise_super_secret_change_me}
+      - DISCOVERY_URL=http://discovery:8761
+      - AUTH_SERVICE_URL=http://auth:4001
+      - CATEGORY_SERVICE_URL=http://category:4002
+      - EXPENSE_SERVICE_URL=http://expense:4003
+      - REPORT_SERVICE_URL=http://report:4004
+    depends_on: [auth, category, expense, report]
+
+volumes:
+  mongo-data:

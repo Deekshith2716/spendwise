@@ -1,0 +1,16 @@
+{
+  "name": "spendwise",
+  "version": "1.0.0",
+  "description": "Corporate Financial Expense Analytics & Budget Reconciliation System (Node.js microservices)",
+  "scripts": {
+    "install:all": "npm --prefix services/discovery install && npm --prefix services/auth install && npm --prefix services/category install && npm --prefix services/expense install && npm --prefix services/report install && npm --prefix services/gateway install",
+    "dev:discovery": "npm --prefix services/discovery start",
+    "dev:auth": "npm --prefix services/auth start",
+    "dev:category": "npm --prefix services/category start",
+    "dev:expense": "npm --prefix services/expense start",
+    "dev:report": "npm --prefix services/report start",
+    "dev:gateway": "npm --prefix services/gateway start",
+    "test": "node --test tests/"
+  },
+  "private": true
+}

@@ -1,0 +1,96 @@
+// Expense Service — logs daily expenses. Validates category via Category Service (Expense -> Category).
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const app = express();
+app.use(cors()); app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'spendwise_super_secret_change_me';
+const PORT = process.env.PORT || 4003;
+const SERVICE_NAME = 'expense-service';
+
+let ExpModel = null;
+(async () => {
+  if (process.env.MONGO_URI) {
+    try {
+      const mongoose = require('mongoose');
+      await mongoose.connect(process.env.MONGO_URI);
+      ExpModel = mongoose.model('Expense', new mongoose.Schema({
+        userId: { type: String, required: true }, categoryId: String,
+        amount: { type: Number, required: true, min: 0.01 }, date: { type: String, required: true },
+        note: String, paymentMethod: { type: String, default: 'cash' },
+      }, { timestamps: true }));
+      console.log('[expense] MongoDB connected');
+    } catch (e) { console.warn('[expense] memory fallback:', e.message); }
+  }
+})();
+let mem = [];
+
+function auth(req, res, next) {
+  const t = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!t) return res.status(401).json({ error: 'missing token' });
+  try { req.user = jwt.verify(t, JWT_SECRET); next(); }
+  catch { return res.status(401).json({ error: 'invalid token' }); }
+}
+const CAT_URL = () => process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002';
+
+// Inter-service call: validate category exists
+async function validateCategory(categoryId, authHeader) {
+  if (!categoryId) return null;
+  try {
+    const r = await fetch(`${CAT_URL()}/${categoryId}`, { headers: { Authorization: authHeader } });
+    if (r.status === 404) throw Object.assign(new Error('invalid category_id'), { status: 400 });
+    if (!r.ok) return null; // category service down -> allow with warning
+    return await r.json();
+  } catch (e) { if (e.status === 400) throw e; return null; }
+}
+
+async function monthTotal(userId, categoryId, month) {
+  const list = ExpModel ? await ExpModel.find({ userId, ...(categoryId && { categoryId }) }) : mem.filter(e => e.userId === userId && (!categoryId || e.categoryId === categoryId));
+  return list.filter(e => (e.date || '').startsWith(month)).reduce((s, e) => s + Number(e.amount), 0);
+}
+
+app.get('/health', (req, res) => res.json({ status: 'UP', service: SERVICE_NAME }));
+
+app.get('/', auth, async (req, res) => {
+  const uid = req.query.userId || req.user.user_id;
+  let list = ExpModel ? await ExpModel.find({ userId: uid }) : mem.filter(e => e.userId === uid);
+  if (req.query.categoryId) list = list.filter(e => (e.categoryId || e.categoryId) === req.query.categoryId);
+  if (req.query.month) list = list.filter(e => (e.date || '').startsWith(req.query.month));
+  res.json(list.map(e => ({ expense_id: e._id ? e._id.toString() : e.expense_id, userId: e.userId, user_id: e.userId, amount: e.amount, date: e.date, categoryId: e.categoryId, category_id: e.categoryId, note: e.note, paymentMethod: e.paymentMethod })));
+});
+
+app.post('/', auth, async (req, res) => {
+  const { amount, date, categoryId, category_id, note = '', paymentMethod = 'cash' } = req.body;
+  const cat = categoryId || category_id;
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+  const d = date || new Date().toISOString().slice(0, 10);
+  let catInfo = null;
+  try { catInfo = await validateCategory(cat, req.headers.authorization); }
+  catch (e) { return res.status(400).json({ error: 'invalid category_id' }); }
+  let saved;
+  if (ExpModel) { const e = await ExpModel.create({ userId: req.user.user_id, categoryId: cat || null, amount: Number(amount), date: d, note, paymentMethod }); saved = { expense_id: e._id.toString(), userId: e.userId, amount: e.amount, date: e.date, categoryId: e.categoryId, note, paymentMethod }; }
+  else { saved = { expense_id: crypto.randomUUID(), userId: req.user.user_id, amount: Number(amount), date: d, categoryId: cat || null, note, paymentMethod }; mem.push(saved); }
+  // spending-threshold monitor
+  let thresholdAlert = null;
+  if (catInfo && catInfo.budgetThreshold > 0) {
+    const total = await monthTotal(req.user.user_id, cat, d.slice(0, 7));
+    if (total > catInfo.budgetThreshold) thresholdAlert = `Monthly spend ${total} exceeded budget ${catInfo.budgetThreshold} for ${catInfo.name}`;
+  }
+  res.status(201).json({ ...saved, thresholdAlert });
+});
+
+app.delete('/:id', auth, async (req, res) => {
+  if (ExpModel) { await ExpModel.findByIdAndDelete(req.params.id); return res.json({ ok: true }); }
+  mem = mem.filter(e => e.expense_id !== req.params.id); res.json({ ok: true });
+});
+
+const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
+let myId = null;
+async function register() { try { const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: 'localhost', port: PORT }) }); myId = (await r.json()).id; } catch {} }
+setInterval(async () => { if (!myId) return register(); try { await fetch(`${DISCOVERY}/heartbeat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, id: myId }) }); } catch {} }, 15000);
+
+if (require.main === module) app.listen(PORT, () => { console.log(`[expense] :${PORT}`); register(); });
+module.exports = app;
