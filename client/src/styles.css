@@ -16,7 +16,6 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; ba
 .nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #c4cfdf; text-decoration: none; font-weight: 600; font-size: 14px; cursor: pointer; }
 .nav a:hover { background: rgba(255,255,255,.07); color: #fff; }
 .nav a.active { background: rgba(14,159,110,.18); color: #fff; box-shadow: inset 2px 0 0 var(--brand); }
-.side-foot { margin-top: auto; padding: 12px; font-size: 12px; color: #7d8da6; border-top: 1px solid rgba(255,255,255,.1); }
 .main { padding: 0 28px 48px; min-width: 0; }
 .topbar { display: flex; align-items: center; gap: 14px; padding: 20px 0; position: sticky; top: 0; background: linear-gradient(var(--bg) 78%, transparent); z-index: 5; }
 .topbar h1 { font-size: 22px; margin: 0; letter-spacing: -.02em; }

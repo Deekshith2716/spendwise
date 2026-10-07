@@ -231,7 +231,6 @@ export default function App() {
           <a className={view === 'categories' ? 'active' : ''} onClick={() => setView('categories')}>◩ Categories</a>
           <a className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>◪ Reports</a>
         </nav>
-        <div className="side-foot">SpendWise v1.0<br />Microservices · MERN</div>
       </aside>
 
       <main className="main">
