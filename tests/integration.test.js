@@ -1,5 +1,6 @@
 // Integration test — boots discovery + category + expense + report in-process, exercises JWT flow.
-// Run: node --test tests/
+// Run: npm test  (from spendwise/)
+process.env.MONGO_URI = ''; // force in-memory store for tests
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 

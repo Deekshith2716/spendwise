@@ -1,4 +1,5 @@
-// Unit tests — run with: node --test tests/
+// Unit tests — run with: npm test  (from spendwise/)
+process.env.MONGO_URI = ''; // force in-memory store for tests
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const { buildSummary } = require('../services/report/server.js');

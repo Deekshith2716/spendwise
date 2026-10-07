@@ -31,7 +31,7 @@ async function resolveService(name) {
 
 // JWT guard — everything except /api/auth/* needs a token
 function gatewayAuth(req, res, next) {
-  if (req.path.startsWith('/api/auth/') || req.path.startsWith('/api/auth')) return next();
+  if (req.path === '/health' || req.path.startsWith('/api/auth')) return next();
   const t = (req.headers.authorization || '').replace('Bearer ', '');
   if (!t) return res.status(401).json({ error: 'missing token (login first)' });
   try { req.user = jwt.verify(t, JWT_SECRET); next(); }
