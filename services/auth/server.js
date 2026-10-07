@@ -1,4 +1,5 @@
 // Auth Service — JWT register/login/verify (MERN). Uses MongoDB if MONGO_URI set, else memory.
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -46,13 +47,24 @@ const sign = (u) => jwt.sign({ user_id: u.user_id, email: u.email, name: u.name 
 app.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password required' });
+  if (String(password).length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'invalid email address' });
   if (await findUser(email)) return res.status(409).json({ error: 'email already registered' });
   const passwordHash = await bcrypt.hash(password, 10);
   const u = await saveUser({ name, email, passwordHash });
   res.status(201).json({ ...u, token: sign(u) });
 });
 
-app.post('/login', async (req, res) => {
+// basic login rate-limit: max 8 attempts / minute per IP
+const attempts = new Map();
+function rateLimit(req, res, next) {
+  const key = req.ip; const now = Date.now();
+  const arr = (attempts.get(key) || []).filter(t => now - t < 60000);
+  if (arr.length >= 8) return res.status(429).json({ error: 'too many attempts, try again in a minute' });
+  arr.push(now); attempts.set(key, arr); next();
+}
+
+app.post('/login', rateLimit, async (req, res) => {
   const { email, password } = req.body;
   const u = await findUser(email);
   if (!u || !(await bcrypt.compare(password, u.passwordHash))) return res.status(401).json({ error: 'invalid credentials' });
@@ -69,6 +81,16 @@ app.post('/verify', (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'UP', service: SERVICE_NAME }));
+
+// current user profile (requires token)
+app.get('/me', (req, res) => {
+  const t = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!t) return res.status(401).json({ error: 'no token' });
+  try {
+    const { user_id, email, name } = jwt.verify(t, JWT_SECRET);
+    res.json({ user_id, email, name });
+  } catch { res.status(401).json({ error: 'invalid token' }); }
+});
 
 // self-register to discovery + heartbeat (Eureka client equivalent)
 const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';

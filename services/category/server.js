@@ -1,4 +1,5 @@
 // Category Service — manages spending taxonomy (category_id, name, budget_threshold)
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -18,7 +19,7 @@ let CatModel = null;
       const mongoose = require('mongoose');
       await mongoose.connect(process.env.MONGO_URI);
       CatModel = mongoose.model('Category', new mongoose.Schema({
-        userId: String, name: { type: String, required: true }, budgetThreshold: { type: Number, default: 0 },
+        userId: { type: String, index: true }, name: { type: String, required: true }, budgetThreshold: { type: Number, default: 0, min: 0 },
       }, { timestamps: true }));
       console.log('[category] MongoDB connected');
     } catch (e) { console.warn('[category] memory fallback:', e.message); }

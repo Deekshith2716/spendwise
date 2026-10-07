@@ -1,4 +1,5 @@
 // API Gateway — single entry point (:4000): JWT check, discovery-aware routing + round-robin load balancing
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -50,6 +51,8 @@ async function proxy(serviceName, req, res, strip) {
     });
     const data = await r.text();
     res.status(r.status);
+    const ct = r.headers.get('content-type'); if (ct) res.set('Content-Type', ct);
+    const cd = r.headers.get('content-disposition'); if (cd) res.set('Content-Disposition', cd);
     try { res.json(JSON.parse(data)); } catch { res.send(data); }
   } catch (e) { res.status(502).json({ error: `${serviceName} unreachable`, detail: e.message }); }
 }

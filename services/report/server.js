@@ -1,4 +1,5 @@
 // Report Service — aggregates Expense + Category into summaries (Report -> Expense -> Category)
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -20,7 +21,7 @@ let RepModel = null;
       const mongoose = require('mongoose');
       await mongoose.connect(process.env.MONGO_URI);
       RepModel = mongoose.model('Report', new mongoose.Schema({
-        userId: String, totalExpense: Number, month: String, breakdown: Object,
+        userId: { type: String, required: true, index: true }, totalExpense: Number, month: { type: String, index: true }, breakdown: Object,
       }, { timestamps: true }));
       console.log('[report] MongoDB connected');
     } catch (e) { console.warn('[report] memory fallback:', e.message); }
@@ -63,12 +64,32 @@ app.get('/summary', auth, async (req, res) => {
   const month = req.query.month || '';
   const H = { Authorization: req.headers.authorization };
   const [er, cr] = await Promise.all([
-    fetch(`${EXP_URL()}/?userId=${uid}${month ? `&month=${month}` : ''}`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${EXP_URL()}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
     fetch(`${CAT_URL()}/`, { headers: H }).then(r => r.json()).catch(() => []),
   ]);
-  res.json({ user_id: uid, ...buildSummary(Array.isArray(er) ? er : [], Array.isArray(cr) ? cr : [], month) });
+  const expenses = Array.isArray(er) ? er : (er.data || []);
+  res.json({ user_id: uid, ...buildSummary(expenses, Array.isArray(cr) ? cr : [], month) });
 });
 
+// GET /export?month=YYYY-MM — download the monthly summary as CSV
+app.get('/export', auth, async (req, res) => {
+  const uid = req.query.userId || req.user.user_id;
+  const month = req.query.month || '';
+  const H = { Authorization: req.headers.authorization };
+  const [er, cr] = await Promise.all([
+    fetch(`${EXP_URL()}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${CAT_URL()}/`, { headers: H }).then(r => r.json()).catch(() => []),
+  ]);
+  const expenses = Array.isArray(er) ? er : (er.data || []);
+  const s = buildSummary(expenses, Array.isArray(cr) ? cr : [], month);
+  const rows = [['Category', 'Transactions', 'Total', 'Budget', 'Status']];
+  for (const c of s.byCategory) rows.push([c.name, c.count, c.total, c.budget || '', c.budget && c.total > c.budget ? 'OVER BUDGET' : 'OK']);
+  rows.push(['TOTAL', s.count, s.total_expense, '', '']);
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  res.header('Content-Type', 'text/csv');
+  res.attachment(`spendwise-${month || 'all'}.csv`);
+  res.send(csv);
+});
 // Saved snapshots (report_id, user_id, total_expense)
 app.post('/', auth, async (req, res) => {
   const { user_id, total_expense, month = '', breakdown = {} } = req.body;

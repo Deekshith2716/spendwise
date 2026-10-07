@@ -1,4 +1,5 @@
 // Discovery Server — Eureka equivalent for MERN (service registry + heartbeat + round-robin data)
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

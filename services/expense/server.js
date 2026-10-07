@@ -1,4 +1,5 @@
 // Expense Service — logs daily expenses. Validates category via Category Service (Expense -> Category).
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -17,11 +18,17 @@ let ExpModel = null;
     try {
       const mongoose = require('mongoose');
       await mongoose.connect(process.env.MONGO_URI);
-      ExpModel = mongoose.model('Expense', new mongoose.Schema({
-        userId: { type: String, required: true }, categoryId: String,
-        amount: { type: Number, required: true, min: 0.01 }, date: { type: String, required: true },
-        note: String, paymentMethod: { type: String, default: 'cash' },
-      }, { timestamps: true }));
+      const ExpSchema = new mongoose.Schema({
+        userId: { type: String, required: true, index: true },
+        categoryId: { type: String, index: true },
+        amount: { type: Number, required: true, min: 0.01 },
+        date: { type: String, required: true, index: true }, // YYYY-MM-DD
+        note: { type: String, maxlength: 255 },
+        paymentMethod: { type: String, default: 'cash', enum: ['cash', 'card', 'upi', 'netbanking', 'other'] },
+      }, { timestamps: true });
+      ExpSchema.index({ userId: 1, date: -1 }); // fast per-user monthly reads
+      ExpSchema.index({ userId: 1, categoryId: 1, date: -1 }); // budget aggregation reads
+      ExpModel = mongoose.model('Expense', ExpSchema);
       console.log('[expense] MongoDB connected');
     } catch (e) { console.warn('[expense] memory fallback:', e.message); }
   }
@@ -54,12 +61,26 @@ async function monthTotal(userId, categoryId, month) {
 
 app.get('/health', (req, res) => res.json({ status: 'UP', service: SERVICE_NAME }));
 
+function fmt(e) {
+  return { expense_id: e._id ? e._id.toString() : e.expense_id, userId: e.userId, user_id: e.userId, amount: e.amount, date: e.date, categoryId: e.categoryId, category_id: e.categoryId, note: e.note, paymentMethod: e.paymentMethod };
+}
+
+// GET /?userId=&month=YYYY-MM&categoryId=&q=&sort=date&order=desc&page=1&limit=20
 app.get('/', auth, async (req, res) => {
   const uid = req.query.userId || req.user.user_id;
-  let list = ExpModel ? await ExpModel.find({ userId: uid }) : mem.filter(e => e.userId === uid);
-  if (req.query.categoryId) list = list.filter(e => (e.categoryId || e.categoryId) === req.query.categoryId);
-  if (req.query.month) list = list.filter(e => (e.date || '').startsWith(req.query.month));
-  res.json(list.map(e => ({ expense_id: e._id ? e._id.toString() : e.expense_id, userId: e.userId, user_id: e.userId, amount: e.amount, date: e.date, categoryId: e.categoryId, category_id: e.categoryId, note: e.note, paymentMethod: e.paymentMethod })));
+  const { categoryId, month, q = '', sort = 'date', order = 'desc' } = req.query;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+
+  let list = ExpModel ? await ExpModel.find({ userId: uid }).lean() : mem.filter(e => e.userId === uid);
+  if (categoryId) list = list.filter(e => (e.categoryId || e.category_id) === categoryId);
+  if (month) list = list.filter(e => (e.date || '').startsWith(month));
+  if (q) list = list.filter(e => (e.note || '').toLowerCase().includes(q.toLowerCase()));
+  list = list.map(fmt).sort((a, b) => order === 'asc' ? (a[sort] > b[sort] ? 1 : -1) : (a[sort] < b[sort] ? 1 : -1));
+
+  const total = list.length;
+  const data = list.slice((page - 1) * limit, page * limit);
+  res.json({ data, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });
 
 app.post('/', auth, async (req, res) => {
@@ -85,6 +106,30 @@ app.post('/', auth, async (req, res) => {
 app.delete('/:id', auth, async (req, res) => {
   if (ExpModel) { await ExpModel.findByIdAndDelete(req.params.id); return res.json({ ok: true }); }
   mem = mem.filter(e => e.expense_id !== req.params.id); res.json({ ok: true });
+});
+
+// edit an expense (re-validates category + amount)
+app.put('/:id', auth, async (req, res) => {
+  const { amount, date, categoryId, note, paymentMethod } = req.body;
+  if (amount !== undefined && Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+  if (categoryId !== undefined) {
+    try { await validateCategory(categoryId, req.headers.authorization); }
+    catch { return res.status(400).json({ error: 'invalid category_id' }); }
+  }
+  const patch = {};
+  if (amount !== undefined) patch.amount = Number(amount);
+  if (date) patch.date = date;
+  if (categoryId !== undefined) patch.categoryId = categoryId;
+  if (note !== undefined) patch.note = note;
+  if (paymentMethod) patch.paymentMethod = paymentMethod;
+  if (ExpModel) {
+    const e = await ExpModel.findOneAndUpdate({ _id: req.params.id, userId: req.user.user_id }, patch, { new: true });
+    if (!e) return res.status(404).json({ error: 'expense not found' });
+    return res.json(fmt(e));
+  }
+  const e = mem.find(x => x.expense_id === req.params.id && x.userId === req.user.user_id);
+  if (!e) return res.status(404).json({ error: 'expense not found' });
+  Object.assign(e, patch); res.json(fmt(e));
 });
 
 const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
