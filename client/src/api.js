@@ -1,8 +1,10 @@
-// API client — talks to the API Gateway (same origin via vite proxy in dev)
+// API client — talks to the API Gateway.
+// Dev: same-origin via vite proxy. Prod: set VITE_GATEWAY_URL to the deployed gateway.
+const GW = (import.meta.env.VITE_GATEWAY_URL || '').replace(/\/$/, '');
 export const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('token') || ''}` });
 
 export async function api(path, opts = {}) {
-  const r = await fetch(path, {
+  const r = await fetch(`${GW}${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...authHeader(), ...(opts.headers || {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -15,7 +17,7 @@ export async function api(path, opts = {}) {
 
 // Download endpoint (CSV export) — saves file in browser
 export async function apiDownload(path, filename) {
-  const r = await fetch(path, { headers: { ...authHeader() } });
+  const r = await fetch(`${GW}${path}`, { headers: { ...authHeader() } });
   if (!r.ok) throw new Error(`Download failed (${r.status})`);
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);

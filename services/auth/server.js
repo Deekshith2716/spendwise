@@ -97,7 +97,7 @@ const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
 let myId = null;
 async function register() {
   try {
-    const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: 'localhost', port: PORT }) });
+    const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: process.env.SERVICE_HOST || 'localhost', port: PORT, url: process.env.SERVICE_URL || process.env.RENDER_EXTERNAL_URL || undefined }) });
     const j = await r.json(); myId = j.id;
   } catch {}
 }

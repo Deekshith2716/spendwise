@@ -105,7 +105,7 @@ app.get('/', auth, async (req, res) => {
 
 const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
 let myId = null;
-async function register() { try { const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: 'localhost', port: PORT }) }); myId = (await r.json()).id; } catch {} }
+async function register() { try { const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: process.env.SERVICE_HOST || 'localhost', port: PORT, url: process.env.SERVICE_URL || process.env.RENDER_EXTERNAL_URL || undefined }) }); myId = (await r.json()).id; } catch {} }
 setInterval(async () => { if (!myId) return register(); try { await fetch(`${DISCOVERY}/heartbeat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, id: myId }) }); } catch {} }, 15000);
 
 if (require.main === module) app.listen(PORT, () => { console.log(`[report] :${PORT}`); register(); });

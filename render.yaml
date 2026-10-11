@@ -1,0 +1,151 @@
+# Render blueprint — deploys all of SpendWise in one click.
+# Prerequisites: MongoDB Atlas M0 (free) connection string.
+# In Render: New > Blueprint > connect your repo. Set MONGO_URI + JWT_SECRET once
+# (shared env group), Render fills in the per-service URLs automatically.
+
+services:
+  - type: web
+    name: spendwise-discovery
+    runtime: node
+    rootDir: services/discovery
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+
+  - type: web
+    name: spendwise-auth
+    runtime: node
+    rootDir: services/auth
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: DISCOVERY_URL
+        fromService:
+          type: web
+          name: spendwise-discovery
+          property: host
+        # becomes https://spendwise-discovery.onrender.com — service appends path as needed
+
+  - type: web
+    name: spendwise-category
+    runtime: node
+    rootDir: services/category
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: DISCOVERY_URL
+        fromService:
+          type: web
+          name: spendwise-discovery
+          property: host
+
+  - type: web
+    name: spendwise-expense
+    runtime: node
+    rootDir: services/expense
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: DISCOVERY_URL
+        fromService:
+          type: web
+          name: spendwise-discovery
+          property: host
+      - key: CATEGORY_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-category
+          property: host
+
+  - type: web
+    name: spendwise-report
+    runtime: node
+    rootDir: services/report
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: DISCOVERY_URL
+        fromService:
+          type: web
+          name: spendwise-discovery
+          property: host
+      - key: EXPENSE_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-expense
+          property: host
+      - key: CATEGORY_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-category
+          property: host
+
+  - type: web
+    name: spendwise-gateway
+    runtime: node
+    rootDir: services/gateway
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: DISCOVERY_URL
+        fromService:
+          type: web
+          name: spendwise-discovery
+          property: host
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-auth
+          property: host
+      - key: CATEGORY_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-category
+          property: host
+      - key: EXPENSE_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-expense
+          property: host
+      - key: REPORT_SERVICE_URL
+        fromService:
+          type: web
+          name: spendwise-report
+          property: host
+
+  - type: web
+    name: spendwise-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      - key: VITE_GATEWAY_URL
+        fromService:
+          type: web
+          name: spendwise-gateway
+          property: host

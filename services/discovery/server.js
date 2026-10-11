@@ -20,11 +20,11 @@ function cleanup() {
 setInterval(cleanup, 10000);
 
 app.post('/register', (req, res) => {
-  const { name, host, port } = req.body;
+  const { name, host, port, url: publicUrl } = req.body;
   if (!name || !port) return res.status(400).json({ error: 'name and port required' });
   const h = host || 'localhost';
   const id = `${name}-${h}-${port}-${Date.now()}`;
-  const url = `http://${h}:${port}`;
+  const url = publicUrl || `http://${h}:${port}`;
   registry[name] = registry[name] || [];
   registry[name] = registry[name].filter(i => i.url !== url);
   registry[name].push({ id, name, host: h, port, url, lastHeartbeat: Date.now() });
