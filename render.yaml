@@ -1,7 +1,8 @@
 # Render blueprint — deploys all of SpendWise in one click.
 # Prerequisites: MongoDB Atlas M0 (free) connection string.
 # In Render: New > Blueprint > connect your repo. Set MONGO_URI + JWT_SECRET once
-# (shared env group), Render fills in the per-service URLs automatically.
+# when prompted. Service-to-service URLs are the stable public onrender.com
+# addresses (free services have no private network).
 
 services:
   - type: web
@@ -25,11 +26,7 @@ services:
       - key: MONGO_URI
         sync: false
       - key: DISCOVERY_URL
-        fromService:
-          type: web
-          name: spendwise-discovery
-          property: host
-        # becomes https://spendwise-discovery.onrender.com — service appends path as needed
+        value: https://spendwise-discovery.onrender.com
 
   - type: web
     name: spendwise-category
@@ -44,10 +41,7 @@ services:
       - key: MONGO_URI
         sync: false
       - key: DISCOVERY_URL
-        fromService:
-          type: web
-          name: spendwise-discovery
-          property: host
+        value: https://spendwise-discovery.onrender.com
 
   - type: web
     name: spendwise-expense
@@ -62,15 +56,9 @@ services:
       - key: MONGO_URI
         sync: false
       - key: DISCOVERY_URL
-        fromService:
-          type: web
-          name: spendwise-discovery
-          property: host
+        value: https://spendwise-discovery.onrender.com
       - key: CATEGORY_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-category
-          property: host
+        value: https://spendwise-category.onrender.com
 
   - type: web
     name: spendwise-report
@@ -85,20 +73,11 @@ services:
       - key: MONGO_URI
         sync: false
       - key: DISCOVERY_URL
-        fromService:
-          type: web
-          name: spendwise-discovery
-          property: host
+        value: https://spendwise-discovery.onrender.com
       - key: EXPENSE_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-expense
-          property: host
+        value: https://spendwise-expense.onrender.com
       - key: CATEGORY_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-category
-          property: host
+        value: https://spendwise-category.onrender.com
 
   - type: web
     name: spendwise-gateway
@@ -111,30 +90,15 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: DISCOVERY_URL
-        fromService:
-          type: web
-          name: spendwise-discovery
-          property: host
+        value: https://spendwise-discovery.onrender.com
       - key: AUTH_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-auth
-          property: host
+        value: https://spendwise-auth.onrender.com
       - key: CATEGORY_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-category
-          property: host
+        value: https://spendwise-category.onrender.com
       - key: EXPENSE_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-expense
-          property: host
+        value: https://spendwise-expense.onrender.com
       - key: REPORT_SERVICE_URL
-        fromService:
-          type: web
-          name: spendwise-report
-          property: host
+        value: https://spendwise-report.onrender.com
 
   - type: web
     name: spendwise-client
@@ -144,7 +108,4 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_GATEWAY_URL
-        fromService:
-          type: web
-          name: spendwise-gateway
-          property: host
+        value: https://spendwise-gateway.onrender.com
