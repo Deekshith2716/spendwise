@@ -93,7 +93,9 @@ app.get('/me', (req, res) => {
 });
 
 // self-register to discovery + heartbeat (Eureka client equivalent)
-const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
+// Render's `host` property may be a bare hostname — ensure a URL scheme.
+function norm(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
+const DISCOVERY = norm(process.env.DISCOVERY_URL || 'http://localhost:8761');
 let myId = null;
 async function register() {
   try {

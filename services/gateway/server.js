@@ -9,13 +9,15 @@ app.use(cors()); app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'spendwise_super_secret_change_me';
 const PORT = process.env.PORT || 4000;
-const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
+// Render's `host` property may be a bare hostname — ensure a URL scheme.
+function norm(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
+const DISCOVERY = norm(process.env.DISCOVERY_URL || 'http://localhost:8761');
 
 const FALLBACK = {
-  'auth-service': () => process.env.AUTH_SERVICE_URL || 'http://localhost:4001',
-  'category-service': () => process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002',
-  'expense-service': () => process.env.EXPENSE_SERVICE_URL || 'http://localhost:4003',
-  'report-service': () => process.env.REPORT_SERVICE_URL || 'http://localhost:4004',
+  'auth-service': () => norm(process.env.AUTH_SERVICE_URL || 'http://localhost:4001'),
+  'category-service': () => norm(process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002'),
+  'expense-service': () => norm(process.env.EXPENSE_SERVICE_URL || 'http://localhost:4003'),
+  'report-service': () => norm(process.env.REPORT_SERVICE_URL || 'http://localhost:4004'),
 };
 const rr = {}; // round-robin counters
 
@@ -41,7 +43,7 @@ function gatewayAuth(req, res, next) {
 app.use(gatewayAuth);
 
 async function proxy(serviceName, req, res, strip) {
-  const base = await resolveService(serviceName);
+  const base = norm(await resolveService(serviceName));
   const target = base + req.originalUrl.replace(strip, '');
   try {
     const r = await fetch(target, {

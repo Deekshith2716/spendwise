@@ -41,7 +41,7 @@ function auth(req, res, next) {
   try { req.user = jwt.verify(t, JWT_SECRET); next(); }
   catch { return res.status(401).json({ error: 'invalid token' }); }
 }
-const CAT_URL = () => process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002';
+const CAT_URL = () => norm(process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002');
 
 // Inter-service call: validate category exists
 async function validateCategory(categoryId, authHeader) {
@@ -132,7 +132,9 @@ app.put('/:id', auth, async (req, res) => {
   Object.assign(e, patch); res.json(fmt(e));
 });
 
-const DISCOVERY = process.env.DISCOVERY_URL || 'http://localhost:8761';
+// Render's `host` property may be a bare hostname — ensure a URL scheme.
+function norm(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
+const DISCOVERY = norm(process.env.DISCOVERY_URL || 'http://localhost:8761');
 let myId = null;
 async function register() { try { const r = await fetch(`${DISCOVERY}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, host: process.env.SERVICE_HOST || 'localhost', port: PORT, url: process.env.SERVICE_URL || process.env.RENDER_EXTERNAL_URL || undefined }) }); myId = (await r.json()).id; } catch {} }
 setInterval(async () => { if (!myId) return register(); try { await fetch(`${DISCOVERY}/heartbeat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: SERVICE_NAME, id: myId }) }); } catch {} }, 15000);
