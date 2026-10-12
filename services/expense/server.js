@@ -43,11 +43,20 @@ function auth(req, res, next) {
 }
 const CAT_URL = () => norm(process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002');
 
+// discovery-first resolution (robust to renamed public URLs), env fallback second
+async function serviceUrl(name, fallback) {
+  try {
+    const r = await fetch(`${DISCOVERY}/services/${name}`);
+    if (r.ok) { const list = await r.json(); if (Array.isArray(list) && list.length) return list[list.length - 1].url; }
+  } catch {}
+  return fallback();
+}
+
 // Inter-service call: validate category exists
 async function validateCategory(categoryId, authHeader) {
   if (!categoryId) return null;
   try {
-    const r = await fetch(`${CAT_URL()}/${categoryId}`, { headers: { Authorization: authHeader } });
+    const r = await fetch(`${await serviceUrl('category-service', CAT_URL)}/${categoryId}`, { headers: { Authorization: authHeader } });
     if (r.status === 404) throw Object.assign(new Error('invalid category_id'), { status: 400 });
     if (!r.ok) return null; // category service down -> allow with warning
     return await r.json();

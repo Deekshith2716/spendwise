@@ -16,6 +16,15 @@ function norm(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^h
 const EXP_URL = () => norm(process.env.EXPENSE_SERVICE_URL || 'http://localhost:4003');
 const CAT_URL = () => norm(process.env.CATEGORY_SERVICE_URL || 'http://localhost:4002');
 
+// discovery-first resolution (robust to renamed public URLs), env fallback second
+async function serviceUrl(name, fallback) {
+  try {
+    const r = await fetch(`${DISCOVERY}/services/${name}`);
+    if (r.ok) { const list = await r.json(); if (Array.isArray(list) && list.length) return list[list.length - 1].url; }
+  } catch {}
+  return fallback();
+}
+
 let RepModel = null;
 (async () => {
   if (process.env.MONGO_URI) {
@@ -65,9 +74,10 @@ app.get('/summary', auth, async (req, res) => {
   const uid = req.query.userId || req.user.user_id;
   const month = req.query.month || '';
   const H = { Authorization: req.headers.authorization };
+  const [expBase, catBase] = await Promise.all([serviceUrl('expense-service', EXP_URL), serviceUrl('category-service', CAT_URL)]);
   const [er, cr] = await Promise.all([
-    fetch(`${EXP_URL()}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
-    fetch(`${CAT_URL()}/`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${expBase}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${catBase}/`, { headers: H }).then(r => r.json()).catch(() => []),
   ]);
   const expenses = Array.isArray(er) ? er : (er.data || []);
   res.json({ user_id: uid, ...buildSummary(expenses, Array.isArray(cr) ? cr : [], month) });
@@ -78,9 +88,10 @@ app.get('/export', auth, async (req, res) => {
   const uid = req.query.userId || req.user.user_id;
   const month = req.query.month || '';
   const H = { Authorization: req.headers.authorization };
+  const [expBase, catBase] = await Promise.all([serviceUrl('expense-service', EXP_URL), serviceUrl('category-service', CAT_URL)]);
   const [er, cr] = await Promise.all([
-    fetch(`${EXP_URL()}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
-    fetch(`${CAT_URL()}/`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${expBase}/?userId=${uid}${month ? `&month=${month}` : ''}&limit=100`, { headers: H }).then(r => r.json()).catch(() => []),
+    fetch(`${catBase}/`, { headers: H }).then(r => r.json()).catch(() => []),
   ]);
   const expenses = Array.isArray(er) ? er : (er.data || []);
   const s = buildSummary(expenses, Array.isArray(cr) ? cr : [], month);
