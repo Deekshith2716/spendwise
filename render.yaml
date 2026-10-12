@@ -136,13 +136,11 @@ services:
           name: spendwise-report
           property: host
 
-  - type: web
+  - type: static_site
     name: spendwise-client
-    runtime: static
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
     envVars:
       - key: VITE_GATEWAY_URL
         fromService:
