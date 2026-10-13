@@ -1,0 +1,26 @@
+# Keeps free-tier Render services awake by pinging /health every 12 minutes.
+# Free instances spin down after 15 idle minutes — this prevents cold starts
+# during demos. Run manually anytime from the Actions tab ("keep-warm" > Run workflow).
+name: keep-warm
+
+on:
+  schedule:
+    - cron: '*/12 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping all services
+        run: |
+          for u in \
+            "https://spendwise-gateway.onrender.com/health" \
+            "https://spendwise-auth.onrender.com/health" \
+            "https://spendwise-category.onrender.com/health" \
+            "https://spendwise-expense-2rtr.onrender.com/health" \
+            "https://spendwise-report.onrender.com/health" \
+            "https://spendwise-discovery.onrender.com/health"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 60 "$u" || echo "000")
+            echo "$u -> $code"
+          done

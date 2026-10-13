@@ -59,7 +59,7 @@ async function proxy(serviceName, req, res, strip) {
     try { parsed = JSON.parse(data); } catch {}
     if (parsed) return res.json(parsed);
     // Downstream returned a non-JSON error page (e.g. host waking up) — normalize it
-    if (r.status >= 400) return res.status(502).json({ error: `${serviceName} is waking up — please retry in ~30 seconds`, retry: true });
+    if (r.status >= 400) return res.status(502).json({ error: `Servers are waking up — please retry in ~30 seconds`, retry: true });
     res.send(data);
   } catch (e) { res.status(502).json({ error: `${serviceName} unreachable`, detail: e.message }); }
 }
