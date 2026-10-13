@@ -51,7 +51,7 @@ function Login({ onDone }) {
           {tab === 'register' && <div className="field"><label>Full name</label><input className="input" value={f.name} onChange={set('name')} placeholder="Aarav Sharma" /></div>}
           <div className="field"><label>Email</label><input className="input" value={f.email} onChange={set('email')} placeholder="you@company.com" /></div>
           <div className="field"><label>Password</label><input className="input" type="password" value={f.password} onChange={set('password')} placeholder="••••••••" onKeyDown={(e) => e.key === 'Enter' && submit()} /></div>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={busy}>{busy ? 'Please wait…' : tab === 'login' ? 'Sign in' : 'Create account'}</button>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={busy}>{busy ? 'Contacting servers… (waking up if idle)' : tab === 'login' ? 'Sign in' : 'Create account'}</button>
         </div>
       </div>
     </div>

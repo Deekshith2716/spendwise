@@ -4,14 +4,23 @@ const GW = (import.meta.env.VITE_GATEWAY_URL || '').replace(/\/$/, '');
 export const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('token') || ''}` });
 
 export async function api(path, opts = {}) {
+  const tries = opts._tries || 1;
+  const { _tries, ...fetchOpts } = opts;
   const r = await fetch(`${GW}${path}`, {
-    ...opts,
+    ...fetchOpts,
     headers: { 'Content-Type': 'application/json', ...authHeader(), ...(opts.headers || {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const t = await r.text();
   let j; try { j = JSON.parse(t); } catch { j = t; }
-  if (!r.ok) throw new Error((j && j.error) || `Request failed (${r.status})`);
+  if (!r.ok) {
+    // Free-tier backends sleep when idle (~40s cold start) — retry automatically
+    if (r.status === 502 && tries < 3) {
+      await new Promise((res) => setTimeout(res, 25000));
+      return api(path, { ...opts, _tries: tries + 1 });
+    }
+    throw new Error((j && j.error) || `Request failed (${r.status})`);
+  }
   return j;
 }
 
